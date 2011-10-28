@@ -68,7 +68,6 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	private boolean  mIsAppRunning = false;
 	private TextView mTextView;
 	private Handler  mHandler;
-	private Calendar mCalendar = Calendar.getInstance();
 
 	// mode
 	private static final int MODE_TIME = 0;
@@ -137,8 +136,9 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 		{
 			if(mIsConnected)
 			{
-				int hour   = mCalendar.get(Calendar.HOUR_OF_DAY);
-				int minute = mCalendar.get(Calendar.MINUTE);
+				Calendar calendar = Calendar.getInstance();
+				int hour   = calendar.get(Calendar.HOUR_OF_DAY);
+				int minute = calendar.get(Calendar.MINUTE);
 
 				// convert to 12 hour time
 				hour = hour % 12;
