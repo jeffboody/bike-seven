@@ -69,9 +69,27 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	private TextView mTextView;
 	private Handler  mHandler;
 
-	// mode
-	private static final int MODE_TIME = 0;
-	private static final int DRAW_TIME = 0x10;   // DIG2 only
+	// command
+	private static final int COMMAND_SET_TIME        = 1;
+	private static final int COMMAND_SET_SPEED       = 2;
+	private static final int COMMAND_SET_DISTANCE    = 3;
+	private static final int COMMAND_GET_TEMPERATURE = 4;
+	private static final int COMMAND_SET_MODE        = 5;
+
+	// draw
+	private static final int DRAW_DIG1    = 3;
+	private static final int DRAW_DIG2    = 2;
+	private static final int DRAW_DIG3    = 1;
+	private static final int DRAW_DIG4    = 0;
+	private static final int DRAW_TIME    = 0x10;   // DIG2 only
+	private static final int DRAW_DECIMAL = 0x20;   // DIG1-DIG4
+	private static final int DRAW_DEGREES = 0x40;   // DIG3 only
+	private static final int DRAW_MINUS   = 0x80;   // DIG1-DIG4
+	private static final int DRAW_SPACE   = 0x0A;
+	private static final int DRAW_NUMBER  = 0x0F;
+
+	// sensors
+	private int mSensorTemperature = 0;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState)
@@ -120,8 +138,54 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	}
 
 	/*
-	 * menu to toggle LED
+	 * commands
 	 */
+	private void SetTime()
+	{
+		Calendar calendar = Calendar.getInstance();
+		int hour   = calendar.get(Calendar.HOUR_OF_DAY);
+		int minute = calendar.get(Calendar.MINUTE);
+
+		// convert to 12 hour time
+		hour = hour % 12;
+		if(hour == 0) hour = 12;
+
+		BTWrite(COMMAND_SET_TIME);
+		BTWrite(minute % 10);
+		BTWrite(minute / 10);
+		BTWrite((hour % 10) | DRAW_TIME);
+		if(hour < 10)
+			BTWrite(0x0A);
+		else
+			BTWrite(hour / 10);
+		BTFlush();
+		BTRead();   // ack
+	}
+
+	private void GetTemperature()
+	{
+		BTWrite(COMMAND_GET_TEMPERATURE);
+		BTFlush();
+
+		int temp = 0;
+		int sign = 1;
+		int scale = 1;
+		int x;
+		BTRead();   // F
+		for(int i = 0; i < 3; ++i)
+		{
+			x = BTRead();
+			if((x & DRAW_MINUS) == DRAW_MINUS)
+				sign = -1;
+			x = x & DRAW_NUMBER;
+			if((x > 9) || (x < 0))
+				x = 0;
+			temp += scale*x;
+			scale *= 10;
+		}
+		mSensorTemperature = sign*temp;
+		BTRead();   // ack
+	}
 
 	/*
 	 * main loop
@@ -136,24 +200,8 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 		{
 			if(mIsConnected)
 			{
-				Calendar calendar = Calendar.getInstance();
-				int hour   = calendar.get(Calendar.HOUR_OF_DAY);
-				int minute = calendar.get(Calendar.MINUTE);
-
-				// convert to 12 hour time
-				hour = hour % 12;
-				if(hour == 0) hour = 12;
-
-				BTWrite(MODE_TIME);
-				BTWrite(minute % 10);
-				BTWrite(minute / 10);
-				BTWrite((hour % 10) | DRAW_TIME);
-				if(hour < 10)
-					BTWrite(0x0A);
-				else
-					BTWrite(hour / 10);
-				BTFlush();
-				int count = BTRead();
+				SetTime();
+				GetTemperature();
 			}
 			else
 			{
@@ -161,8 +209,8 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 			}
 			mHandler.sendEmptyMessage(0);
 
-			// wait briefly before sending the next packet
-			try { Thread.sleep((long) (1000.0F/30.0F)); }
+			// wait briefly before sending the next command
+			try { Thread.sleep((long) (1000.0F)); }
 			catch(InterruptedException e) { Log.e(TAG, e.getMessage());}
 		}
 
@@ -182,7 +230,8 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	private void UpdateUI()
 	{
 		mTextView.setText("Bluetooth mac address is " + mBluetoothAddress + "\n" +
-		                  "Bluetooth is " + (mIsConnected ? "connected" : "disconnected") + "\n");
+		                  "Bluetooth is " + (mIsConnected ? "connected" : "disconnected") + "\n" +
+		                  "Temperature is " + mSensorTemperature + " F\n");
 	}
 
 	/*

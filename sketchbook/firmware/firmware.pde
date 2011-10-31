@@ -30,19 +30,31 @@ int MODE_DISTANCE    = 2;
 int MODE_TEMPERATURE = 3;
 int MODE_END         = 4;
 
+// command
+int command;
+int COMMAND_NONE            = 0;
+int COMMAND_ACK             = 0;
+int COMMAND_SET_TIME        = 1;
+int COMMAND_SET_SPEED       = 2;
+int COMMAND_SET_DISTANCE    = 3;
+int COMMAND_GET_TEMPERATURE = 4;
+int COMMAND_SET_MODE        = 5;
+
 // button
 int button_state;
 unsigned long button_t0;
 int BUTTON_UP            = 0;
 int BUTTON_DOWN          = 1;
 int BUTTON_DEBOUNCE      = 2;
-int BUTTON_DEBOUNCE_TIME = 100; // ms
+int BUTTON_DEBOUNCE_TIME = 100;   // ms
 
 // sensors
 int sensor_time[4];
 int sensor_speed[4];
 int sensor_distance[4];
 int sensor_temperature[4];
+int sensor_temperature_t0;
+unsigned int SENSOR_TEMPERATURE_DT = 1000;   // ms
 
 // draw
 int DRAW_DIG1    = 3;
@@ -53,32 +65,59 @@ int DRAW_TIME    = 0x10;   // DIG2 only
 int DRAW_DECIMAL = 0x20;   // DIG1-DIG4
 int DRAW_DEGREES = 0x40;   // DIG3 only
 int DRAW_MINUS   = 0x80;   // DIG1-DIG4
+int DRAW_SPACE   = 0x0A;
 int DRAW_NUMBER  = 0x0F;
 unsigned int DRAW_DELAY = 1000 / (4 * 20);
 
-void update_temperature(void)
+void update_temperature(int force)
 {
-  // convert to sensor_temperature
-  // http://www.arduino.cc/playground/ComponentLib/Thermistor2
-  // 1024  = I (10K + R)
-  // V     = I R
-  // R     = (10K V) / (1024 - V)
-  float v  = (float) analogRead(PIN_TEMP);
-  float r  = (10000.0f * v) / (1024.0f - v);
-  float a1 = 3.354016E-03;
-  float b1 = 2.569850E-04;
-  float c1 = 2.620131E-06;
-  float d1 = 6.383091E-08;
-  float rref    = 10000.0f;   // resistance at 25 degrees celsius
-  float lnr     = log(r / rref);
-  float kelvin  = 1.0f / (a1 + b1*lnr + c1*lnr*lnr + d1*lnr*lnr*lnr);
-  float celsius = kelvin - 273.15;
-  int temp      = (int) ((celsius * 9.0f)/ 5.0f + 32.0f);
+  unsigned int t1 = millis();
+  unsigned int dt = t1 - sensor_temperature_t0;
 
-  sensor_temperature[DRAW_DIG1] = (temp >= 100) ? (temp / 100) % 10 : 0x0A;
-  sensor_temperature[DRAW_DIG2] = (temp >= 10)  ? (temp / 10)  % 10 : 0x0A;
-  sensor_temperature[DRAW_DIG3] = (temp % 10) | DRAW_DEGREES;
-  sensor_temperature[DRAW_DIG4] = 0x0F;
+  if(force || (dt >= SENSOR_TEMPERATURE_DT))
+  {
+    // convert to sensor_temperature
+    // http://www.arduino.cc/playground/ComponentLib/Thermistor2
+    // 1024  = I (10K + R)
+    // V     = I R
+    // R     = (10K V) / (1024 - V)
+    float v  = (float) analogRead(PIN_TEMP);
+    float r  = (10000.0f * v) / (1024.0f - v);
+    float a1 = 3.354016E-03;
+    float b1 = 2.569850E-04;
+    float c1 = 2.620131E-06;
+    float d1 = 6.383091E-08;
+    float rref    = 10000.0f;   // resistance at 25 degrees celsius
+    float lnr     = log(r / rref);
+    float kelvin  = 1.0f / (a1 + b1*lnr + c1*lnr*lnr + d1*lnr*lnr*lnr);
+    float celsius = kelvin - 273.15;
+    int temp      = (int) ((celsius * 9.0f)/ 5.0f + 32.0f);
+
+    // initialize to 0 degrees F
+    sensor_temperature[DRAW_DIG1] = DRAW_SPACE;
+    sensor_temperature[DRAW_DIG2] = DRAW_SPACE;
+    sensor_temperature[DRAW_DIG3] = 0x00 | DRAW_DEGREES;
+    sensor_temperature[DRAW_DIG4] = 0x0F;
+
+    // draw the minus
+    if(temp <= -10)
+    {
+      sensor_temperature[DRAW_DIG1] |= DRAW_MINUS;
+      temp *= -1;
+    }
+    else if(temp < 0)
+    {
+      sensor_temperature[DRAW_DIG2] |= DRAW_MINUS;
+      temp *= -1;
+    }
+
+    // draw absolute value of temperature
+    if(temp >= 100) sensor_temperature[DRAW_DIG1] = (temp / 100) % 10;
+    if(temp >= 10)  sensor_temperature[DRAW_DIG2] = (temp / 10)  % 10;
+    sensor_temperature[DRAW_DIG3] = (temp % 10) | DRAW_DEGREES;
+
+    sensor_temperature_t0 = t1;
+  }
 }
 
 void update_button(void)
@@ -127,30 +166,44 @@ void read_android(int* data)
   data[DRAW_DIG1] = Serial.read();
 }
 
+void write_android(int* data)
+{
+  Serial.write(data[DRAW_DIG4]);
+  Serial.write(data[DRAW_DIG3]);
+  Serial.write(data[DRAW_DIG2]);
+  Serial.write(data[DRAW_DIG1]);
+}
+
 void update_android(void)
 {
-  if(Serial.available() >= 5)
-  {
-    int mode = Serial.read();
-    if(mode == MODE_TIME)
-    {
-      read_android(sensor_time);
-    }
-    else if(mode == MODE_SPEED)
-    {
-      read_android(sensor_speed);
-    }
-    else if(mode == MODE_DISTANCE)
-    {
-      read_android(sensor_distance);
-    }
-    else
-    {
-      int unknown[4];
-      read_android(unknown);
-    }
+  int avail = Serial.available();
 
-    Serial.write(5);
+  // check if a new command has been issued
+  if((command == COMMAND_NONE) && (avail >= 1))
+  {
+    command = Serial.read();
+    --avail;
+  }
+
+  // read command if ready
+  if(command != COMMAND_NONE)
+  {
+    if((command == COMMAND_SET_TIME) && (avail >= 4))
+      read_android(sensor_time);
+    else if((command == COMMAND_SET_SPEED) && (avail >= 4))
+      read_android(sensor_speed);
+    else if((command == COMMAND_SET_DISTANCE) && (avail >= 4))
+      read_android(sensor_distance);
+    else if(command == COMMAND_GET_TEMPERATURE)
+      write_android(sensor_temperature);
+    else if((command == COMMAND_SET_MODE) && (avail >= 1))
+      mode = Serial.read();
+    else
+      return;
+
+    // acknowlege and reset command
+    Serial.write(COMMAND_ACK);
+    command = COMMAND_NONE;
   }
 }
 
@@ -342,8 +395,9 @@ void setup()
   digitalWrite(PIN_F,      HIGH);
   digitalWrite(PIN_G,      HIGH);
 
-  // initialize mode
-  mode = MODE_TIME;
+  // initialize mode and command
+  mode    = MODE_TEMPERATURE;
+  command = COMMAND_NONE;
 
   // initialize buttons
   button_state = BUTTON_UP;
@@ -356,20 +410,18 @@ void setup()
   sensor_time[DRAW_DIG3] = 0x00;
   sensor_time[DRAW_DIG4] = 0x00;
   // 0.0
-  sensor_speed[DRAW_DIG1] = 0x0A;
-  sensor_speed[DRAW_DIG2] = 0x0A;
+  sensor_speed[DRAW_DIG1] = DRAW_SPACE;
+  sensor_speed[DRAW_DIG2] = DRAW_SPACE;
   sensor_speed[DRAW_DIG3] = 0x00 | DRAW_DECIMAL;
   sensor_speed[DRAW_DIG4] = 0x00;
   // 0.0
-  sensor_distance[DRAW_DIG1] = 0x0A;
-  sensor_distance[DRAW_DIG2] = 0x0A;
+  sensor_distance[DRAW_DIG1] = DRAW_SPACE;
+  sensor_distance[DRAW_DIG2] = DRAW_SPACE;
   sensor_distance[DRAW_DIG3] = 0x00 | DRAW_DECIMAL;
   sensor_distance[DRAW_DIG4] = 0x00;
-  // 0 degrees
-  sensor_temperature[DRAW_DIG1] = 0x0A;
-  sensor_temperature[DRAW_DIG2] = 0x0A;
-  sensor_temperature[DRAW_DIG3] = 0x00 | DRAW_DEGREES;
-  sensor_temperature[DRAW_DIG4] = 0x0F;
+  // offset temperature to force reading
+  sensor_temperature_t0 = millis();
+  update_temperature(1);
 
   // 115200 is the default for Android
   Serial.begin(115200);
@@ -378,7 +430,7 @@ void setup()
 void loop()
 {
   // update sensors
-  update_temperature();
+  update_temperature(0);
   update_button();
   update_android();
 
