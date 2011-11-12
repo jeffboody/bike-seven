@@ -32,6 +32,7 @@ import android.util.Log;
 import android.os.Looper;
 import android.os.Handler;
 import android.os.Message;
+import android.os.PowerManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -52,6 +53,9 @@ import android.location.LocationListener;
 public class BikeSeven extends Activity implements Runnable, LocationListener, Handler.Callback
 {
 	private static final String TAG = "BikeSeven";
+
+	// Screen state
+	private PowerManager.WakeLock mWakeLock;
 
 	// bluetooth code is based on this example
 	// http://groups.google.com/group/android-beginners/browse_thread/thread/322c99d3b907a9e9/e1e920fe50135738?pli=1
@@ -128,6 +132,9 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 			mAltitude = (float) loc.getAltitude() * FEET;
 			mAccuracy = 999;
 		}
+
+		PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+		mWakeLock = pm.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, "BikeSeven");
 	}
 
 	@Override
@@ -160,6 +167,8 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 			Log.e(TAG, "exception: " + e);
 		}
 
+		mWakeLock.acquire();
+
 		UpdateUI();
 		Thread t = new Thread(this);
 		t.start();
@@ -168,6 +177,7 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 	@Override
 	protected void onPause()
 	{
+		mWakeLock.release();
 		mLocationManager.removeUpdates(this);
 		mIsAppRunning = false;
 		super.onPause();
