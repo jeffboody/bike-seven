@@ -39,11 +39,17 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.UUID;
 import java.util.Calendar;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
+import android.location.LocationManager;
+import android.location.Location;
+import android.location.LocationListener;
 
-public class BikeSeven extends Activity implements Runnable, Handler.Callback
+public class BikeSeven extends Activity implements Runnable, LocationListener, Handler.Callback
 {
 	private static final String TAG = "BikeSeven";
 
@@ -63,6 +69,19 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	private String           mBluetoothAddress = null;
 	private OutputStream     mOutputStream     = null;
 	private InputStream      mInputStream      = null;
+
+	// synchronization
+	private Lock mLock = new ReentrantLock();
+
+	// Location state
+	private static final float MPH  = 2.23693629F;   // meters/second to miles/hour
+	private static final float FEET = 3.2808399F;    // meters to feet
+	private LocationManager mLocationManager;
+	private long            mTime     = 0;
+	private float           mSpeed    = 0.0F;
+	private float           mDistance = 0.0F;
+	private float           mAltitude = 0.0F;
+	private float           mAccuracy = 0.0F;
 
 	// app state
 	private boolean  mIsAppRunning = false;
@@ -98,6 +117,17 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 		mTextView = new TextView(this);
 		mHandler  = new Handler(this);
 		setContentView(mTextView);
+
+		mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+		Location loc = mLocationManager.getLastKnownLocation("gps");
+		if(loc != null)
+		{
+			mTime     = 0;
+			mSpeed    = 0.0F;
+			mDistance = 0.0F;
+			mAltitude = (float) loc.getAltitude() * FEET;
+			mAccuracy = 999;
+		}
 	}
 
 	@Override
@@ -119,6 +149,17 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 			mBluetoothAddress = null;
 		}
 
+		// listen for gps
+		try
+		{
+			if(mLocationManager.isProviderEnabled("gps"))
+				mLocationManager.requestLocationUpdates("gps", 0L, 0.0F, this);
+		}
+		catch(Exception e)
+		{
+			Log.e(TAG, "exception: " + e);
+		}
+
 		UpdateUI();
 		Thread t = new Thread(this);
 		t.start();
@@ -127,6 +168,7 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	@Override
 	protected void onPause()
 	{
+		mLocationManager.removeUpdates(this);
 		mIsAppRunning = false;
 		super.onPause();
 	}
@@ -134,6 +176,7 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 	@Override
 	protected void onDestroy()
 	{
+		mLocationManager = null;
 		super.onDestroy();
 	}
 
@@ -160,6 +203,46 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 			BTWrite(hour / 10);
 		BTFlush();
 		BTRead();   // ack
+	}
+
+	private void SetSpeed()
+	{
+		mLock.lock();
+		try
+		{
+			int s = (int) (10.0F * mSpeed + 0.5F);
+			BTWrite(COMMAND_SET_SPEED);
+			BTWrite(s % 10);
+			BTWrite(((s / 10) % 10) | DRAW_DECIMAL);
+			BTWrite(s >= 100 ? (s / 100) % 10 : 0x0A);
+			BTWrite(s >= 1000 ? s / 1000 : 0x0A);
+			BTFlush();
+			BTRead();   // ack
+		}
+		finally
+		{
+			mLock.unlock();
+		}
+	}
+
+	private void SetDistance()
+	{
+		mLock.lock();
+		try
+		{
+			int d = (int) (10.0F * mDistance + 0.5F);
+			BTWrite(COMMAND_SET_DISTANCE);
+			BTWrite(d % 10);
+			BTWrite(((d / 10) % 10) | DRAW_DECIMAL);
+			BTWrite(d >= 100 ? (d / 100) % 10 : 0x0A);
+			BTWrite(d >= 1000 ? d / 1000 : 0x0A);
+			BTFlush();
+			BTRead();   // ack
+		}
+		finally
+		{
+			mLock.unlock();
+		}
 	}
 
 	private void GetTemperature()
@@ -201,6 +284,8 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 			if(mIsConnected)
 			{
 				SetTime();
+				SetSpeed();
+				SetDistance();
 				GetTemperature();
 			}
 			else
@@ -229,9 +314,61 @@ public class BikeSeven extends Activity implements Runnable, Handler.Callback
 
 	private void UpdateUI()
 	{
-		mTextView.setText("Bluetooth mac address is " + mBluetoothAddress + "\n" +
-		                  "Bluetooth is " + (mIsConnected ? "connected" : "disconnected") + "\n" +
-		                  "Temperature is " + mSensorTemperature + " F\n");
+		mLock.lock();
+		try
+		{
+			mTextView.setText(String.format("Bluetooth mac address is %s\n", mBluetoothAddress) +
+			                  String.format("Bluetooth is %s\n", mIsConnected ? "connected" : "disconnected") +
+			                  String.format("Temperature is %d F\n", mSensorTemperature) +
+			                  String.format("Speed is %.1f mph\n", mSpeed) +
+			                  String.format("Distance is %.1f miles\n", mDistance) +
+			                  String.format("Altitude is %d feet\n", (int) mAltitude) +
+			                  String.format("Accuracy is %d meters\n", (int) mAccuracy));
+		}
+		finally
+		{
+			mLock.unlock();
+		}
+	}
+
+	/*
+	 * LocationListener interface
+	 */
+
+	public void onLocationChanged(Location location)
+	{
+		mLock.lock();
+		try
+		{
+			long t0 = mTime;
+			long t1 = location.getTime();
+			mTime     = t1;
+			mSpeed    = location.getSpeed() * MPH;
+			mAltitude = (float) location.getAltitude() * FEET;
+			mAccuracy = location.getAccuracy();
+
+			if(t0 != 0)
+			{
+				float dt = (float) (t1 - t0) / 3600000.0F;   // hours
+				mDistance += mSpeed * dt;
+			}
+		}
+		finally
+		{
+			mLock.unlock();
+		}
+	}
+
+	public void onProviderDisabled(String provider)
+	{
+	}
+
+	public void onProviderEnabled(String provider)
+	{
+	}
+
+	public void onStatusChanged(String provider, int status, Bundle extras)
+	{
 	}
 
 	/*
