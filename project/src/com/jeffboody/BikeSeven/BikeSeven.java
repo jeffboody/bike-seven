@@ -78,8 +78,10 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 	private Lock mLock = new ReentrantLock();
 
 	// Location state
-	private static final float MPH  = 2.23693629F;   // meters/second to miles/hour
-	private static final float FEET = 3.2808399F;    // meters to feet
+	private static final float MPH     = 2.23693629F;   // meters/second to miles/hour
+	private static final float FEET    = 3.2808399F;    // meters to feet
+	private static final float MS2SECONDS    = 1.0F / 1000.0F;   // ms to seconds
+	private static final float SECONDS2HOURS = 1.0F / 3600.0F;   // seconds to hours
 	private LocationManager mLocationManager;
 	private long            mTime     = 0;
 	private float           mSpeed    = 0.0F;
@@ -352,15 +354,16 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 		{
 			long t0 = mTime;
 			long t1 = location.getTime();
+			float dt = (float) (t1 - t0) * MS2SECONDS;
 			mTime     = t1;
 			mSpeed    = location.getSpeed() * MPH;
 			mAltitude = (float) location.getAltitude() * FEET;
 			mAccuracy = location.getAccuracy();
 
-			if(t0 != 0)
+			// ignore low accuracy results and low frequency location updates
+			if((t0 != 0) && (mAccuracy <= 30) && (dt < 3))
 			{
-				float dt = (float) (t1 - t0) / 3600000.0F;   // hours
-				mDistance += mSpeed * dt;
+				mDistance += mSpeed * dt * SECONDS2HOURS;
 			}
 		}
 		finally
