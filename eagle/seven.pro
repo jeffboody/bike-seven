@@ -2,12 +2,12 @@ EAGLE AutoRouter Statistics:
 
 Job           : /home/jeffboody/src/bike-seven/eagle/seven.brd
 
-Start at      : 23:39:51 (10/29/11)
-End at        : 23:39:51 (10/29/11)
+Start at      : 08:57:50 (11/13/11)
+End at        : 08:57:50 (11/13/11)
 Elapsed time  : 00:00:00
 
-Signals       :    32   RoutingGrid: 50 mil  Layers: 2
-Connections   :    49   predefined:  0 ( 0 Vias )
+Signals       :    31   RoutingGrid: 50 mil  Layers: 2
+Connections   :    48   predefined:  0 ( 0 Vias )
 
 Router memory :   10000
 
@@ -18,8 +18,8 @@ Number of Ripups  :         0         0         0         0         0         0
 max. Level        :         0         0         0         0         0         0
 max. Total        :         0         0         0         0         0         0
 
-Routed            :        15        49        49        49        49        49
-Vias              :         0        26         2         0         0         0
-Resolution        :    30.6 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %
+Routed            :        15        48        48        48        48        48
+Vias              :         0        30         2         0         0         0
+Resolution        :    31.2 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %
 
 Final             : 100.0% finished
