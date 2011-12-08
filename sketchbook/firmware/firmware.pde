@@ -67,7 +67,7 @@ int DRAW_DEGREES = 0x40;   // DIG3 only
 int DRAW_MINUS   = 0x80;   // DIG1-DIG4
 int DRAW_SPACE   = 0x0A;
 int DRAW_NUMBER  = 0x0F;
-unsigned int DRAW_DELAY = 1000 / (4 * 20);
+unsigned int DRAW_DELAY = 1000000 / (60 * 34);   // 60 HZ
 
 void update_temperature(int force)
 {
