@@ -67,7 +67,7 @@ int DRAW_DEGREES = 0x40;   // DIG3 only
 int DRAW_MINUS   = 0x80;   // DIG1-DIG4
 int DRAW_SPACE   = 0x0A;
 int DRAW_NUMBER  = 0x0F;
-unsigned int DRAW_DELAY = 1000000 / (60 * 34);   // 60 HZ
+unsigned int DRAW_DELAY = 1000000 / (60 * 7);   // 60 HZ, 7 segments
 
 void update_temperature(int force)
 {
@@ -207,153 +207,60 @@ void update_android(void)
   }
 }
 
-void draw_segment(int segment)
+// 'A' is space
+// 'F' is F
+// mapping:         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F
+int TABLE_A[16] = { 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1 };
+int TABLE_B[16] = { 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
+int TABLE_C[16] = { 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
+int TABLE_D[16] = { 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+int TABLE_E[16] = { 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1 };
+int TABLE_F[16] = { 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1 };
+int TABLE_G[16] = { 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1 };
+
+void draw_dig(int dig, int segment, int data)
 {
+  int number = data & 0xF;
+  if(segment == PIN_A)
+     digitalWrite(dig, TABLE_A[number]);
+  else if(segment == PIN_B)
+     digitalWrite(dig, TABLE_B[number]);
+  else if(segment == PIN_C)
+     digitalWrite(dig, TABLE_C[number]);
+  else if(segment == PIN_D)
+     digitalWrite(dig, TABLE_D[number]);
+  else if(segment == PIN_E)
+     digitalWrite(dig, TABLE_E[number]);
+  else if(segment == PIN_F)
+     digitalWrite(dig, TABLE_F[number]);
+  else if(segment == PIN_G)
+     digitalWrite(dig, TABLE_G[number]);
+}
+
+void draw_segment(int segment, int* data)
+{
+  draw_dig(PIN_DIG1, segment, data[DRAW_DIG1]);
+  draw_dig(PIN_DIG2, segment, data[DRAW_DIG2]);
+  draw_dig(PIN_DIG3, segment, data[DRAW_DIG3]);
+  draw_dig(PIN_DIG4, segment, data[DRAW_DIG4]);
   digitalWrite(segment, LOW);
   delayMicroseconds(DRAW_DELAY);
   digitalWrite(segment, HIGH);
-}
-
-void draw_dig(int dig, int data)
-{
-  int number  = data & DRAW_NUMBER;
-
-  // draw number
-  // note: delay keeps the duty cycle constant
-  digitalWrite(dig, HIGH);
-  if(number == 0)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    draw_segment(PIN_D);
-    draw_segment(PIN_E);
-    draw_segment(PIN_F);
-    delayMicroseconds(DRAW_DELAY);
-  }
-  else if(number == 1)
-  {
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    delayMicroseconds(5*DRAW_DELAY);
-  }
-  else if(number == 2)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_B);
-    draw_segment(PIN_D);
-    draw_segment(PIN_E);
-    draw_segment(PIN_G);
-    delayMicroseconds(2*DRAW_DELAY);
-  }
-  else if(number == 3)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    draw_segment(PIN_D);
-    draw_segment(PIN_G);
-    delayMicroseconds(2*DRAW_DELAY);
-  }
-  else if(number == 4)
-  {
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    draw_segment(PIN_F);
-    draw_segment(PIN_G);
-    delayMicroseconds(3*DRAW_DELAY);
-  }
-  else if(number == 5)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_C);
-    draw_segment(PIN_D);
-    draw_segment(PIN_F);
-    draw_segment(PIN_G);
-    delayMicroseconds(2*DRAW_DELAY);
-  }
-  else if(number == 6)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_C);
-    draw_segment(PIN_D);
-    draw_segment(PIN_E);
-    draw_segment(PIN_F);
-    draw_segment(PIN_G);
-    delayMicroseconds(DRAW_DELAY);
-  }
-  else if(number == 7)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    delayMicroseconds(4*DRAW_DELAY);
-  }
-  else if(number == 8)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    draw_segment(PIN_D);
-    draw_segment(PIN_E);
-    draw_segment(PIN_F);
-    draw_segment(PIN_G);
-  }
-  else if(number == 9)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_B);
-    draw_segment(PIN_C);
-    draw_segment(PIN_D);
-    draw_segment(PIN_F);
-    draw_segment(PIN_G);
-    delayMicroseconds(DRAW_DELAY);
-  }
-  else if(number == 0xF)
-  {
-    draw_segment(PIN_A);
-    draw_segment(PIN_E);
-    draw_segment(PIN_F);
-    draw_segment(PIN_G);
-    delayMicroseconds(3*DRAW_DELAY);
-  }
-
-  // draw minus
-  if(data & DRAW_MINUS)
-  {
-    draw_segment(PIN_G);
-  }
-
-  // draw decimal
-  if(data & DRAW_DECIMAL)
-  {
-    draw_segment(PIN_DP);
-  }
-  digitalWrite(dig, LOW);
-
-  // draw colon
-  if((dig == PIN_DIG2) && (data & DRAW_TIME))
-  {
-    digitalWrite(PIN_DIGCOL, HIGH);
-    draw_segment(PIN_COL);
-    digitalWrite(PIN_DIGCOL, LOW);
-  }
-
-  // draw degrees
-  if((dig == PIN_DIG3) && (data & DRAW_DEGREES))
-  {
-    digitalWrite(PIN_DIGL3, HIGH);
-    draw_segment(PIN_L3);
-    digitalWrite(PIN_DIGL3, LOW);
-  }
+  digitalWrite(PIN_DIG1, LOW);
+  digitalWrite(PIN_DIG2, LOW);
+  digitalWrite(PIN_DIG3, LOW);
+  digitalWrite(PIN_DIG4, LOW);
 }
 
 void draw(int* data)
 {
-  draw_dig(PIN_DIG1, data[DRAW_DIG1]);
-  draw_dig(PIN_DIG2, data[DRAW_DIG2]);
-  draw_dig(PIN_DIG3, data[DRAW_DIG3]);
-  draw_dig(PIN_DIG4, data[DRAW_DIG4]);
+  draw_segment(PIN_A, data);
+  draw_segment(PIN_B, data);
+  draw_segment(PIN_C, data);
+  draw_segment(PIN_D, data);
+  draw_segment(PIN_E, data);
+  draw_segment(PIN_F, data);
+  draw_segment(PIN_G, data);
 }
 
 void setup()
