@@ -40,6 +40,7 @@ Bike Seven Readme
 	6) Copy bluesmirf.cfg to /mnt/sdcard on your Android phone
 
 [Uninstalling]
+
 	On the device/emulator, navigate to Settings, Applications, Manage applications
 
 	Or uninstall via adb
@@ -59,9 +60,11 @@ Bike Seven Readme
 	   and place it into the Bike Seven socket
 
 [Feedback]
+
 	Send questions or comments to Jeff Boody at jeffboody@gmail.com
 
 [License]
+
 	Copyright (c) 2011 Jeff Boody
 
 	Permission is hereby granted, free of charge, to any person obtaining a
