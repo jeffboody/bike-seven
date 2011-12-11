@@ -64,8 +64,8 @@ int DRAW_DIG4    = 0;
 int DRAW_TIME    = 0x10;   // DIG2 only
 int DRAW_DECIMAL = 0x20;   // DIG1-DIG4
 int DRAW_DEGREES = 0x40;   // DIG3 only
-int DRAW_MINUS   = 0x80;   // DIG1-DIG4
 int DRAW_SPACE   = 0x0A;
+int DRAW_MINUS   = 0x0B;
 int DRAW_NUMBER  = 0x0F;
 unsigned int DRAW_DELAY = 1000000 / (60 * 7);   // 60 HZ, 7 segments
 
@@ -102,12 +102,12 @@ void update_temperature(int force)
     // draw the minus
     if(temp <= -10)
     {
-      sensor_temperature[DRAW_DIG1] |= DRAW_MINUS;
+      sensor_temperature[DRAW_DIG1] = DRAW_MINUS;
       temp *= -1;
     }
     else if(temp < 0)
     {
-      sensor_temperature[DRAW_DIG2] |= DRAW_MINUS;
+      sensor_temperature[DRAW_DIG2] = DRAW_MINUS;
       temp *= -1;
     }
 
@@ -207,16 +207,14 @@ void update_android(void)
   }
 }
 
-// 'A' is space
-// 'F' is F
-// mapping:         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F
+// mapping:         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, _, -, X, X, X, F
 int TABLE_A[16] = { 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1 };
 int TABLE_B[16] = { 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
 int TABLE_C[16] = { 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
 int TABLE_D[16] = { 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
 int TABLE_E[16] = { 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1 };
 int TABLE_F[16] = { 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1 };
-int TABLE_G[16] = { 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1 };
+int TABLE_G[16] = { 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1 };
 
 void draw_dig(int dig, int segment, int data)
 {

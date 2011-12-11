@@ -109,8 +109,8 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 	private static final int DRAW_TIME    = 0x10;   // DIG2 only
 	private static final int DRAW_DECIMAL = 0x20;   // DIG1-DIG4
 	private static final int DRAW_DEGREES = 0x40;   // DIG3 only
-	private static final int DRAW_MINUS   = 0x80;   // DIG1-DIG4
 	private static final int DRAW_SPACE   = 0x0A;
+	private static final int DRAW_MINUS   = 0x0B;
 	private static final int DRAW_NUMBER  = 0x0F;
 
 	// sensors
@@ -269,10 +269,9 @@ public class BikeSeven extends Activity implements Runnable, LocationListener, H
 		BTRead();   // F
 		for(int i = 0; i < 3; ++i)
 		{
-			x = BTRead();
-			if((x & DRAW_MINUS) == DRAW_MINUS)
+			x = BTRead() & DRAW_NUMBER;
+			if(x == DRAW_MINUS)
 				sign = -1;
-			x = x & DRAW_NUMBER;
 			if((x > 9) || (x < 0))
 				x = 0;
 			temp += scale*x;
