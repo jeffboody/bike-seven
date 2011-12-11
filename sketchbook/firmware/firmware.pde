@@ -67,7 +67,7 @@ int DRAW_DEGREES = 0x40;   // DIG3 only
 int DRAW_SPACE   = 0x0A;
 int DRAW_MINUS   = 0x0B;
 int DRAW_NUMBER  = 0x0F;
-unsigned int DRAW_DELAY = 1000000 / (60 * 7);   // 60 HZ, 7 segments
+unsigned int DRAW_DELAY = 1000000 / (60 * 8);   // 60 HZ, 8 segments
 
 void update_temperature(int force)
 {
@@ -219,6 +219,7 @@ int TABLE_G[16] = { 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1 };
 void draw_dig(int dig, int segment, int data)
 {
   int number = data & 0xF;
+  int dp     = (data & DRAW_DECIMAL) ? 1 : 0;
   if(segment == PIN_A)
      digitalWrite(dig, TABLE_A[number]);
   else if(segment == PIN_B)
@@ -233,32 +234,61 @@ void draw_dig(int dig, int segment, int data)
      digitalWrite(dig, TABLE_F[number]);
   else if(segment == PIN_G)
      digitalWrite(dig, TABLE_G[number]);
+  else if(segment == PIN_DP)
+     digitalWrite(dig, dp);
 }
 
 void draw_segment(int segment, int* data)
 {
+  // draw the segment for all digits
   draw_dig(PIN_DIG1, segment, data[DRAW_DIG1]);
   draw_dig(PIN_DIG2, segment, data[DRAW_DIG2]);
   draw_dig(PIN_DIG3, segment, data[DRAW_DIG3]);
   draw_dig(PIN_DIG4, segment, data[DRAW_DIG4]);
   digitalWrite(segment, LOW);
+
+  // when PIN_DP is set also draw the colon and degree
+  // note that decimal, colon and degree are powered
+  // by different DIG pins so enabling all won't burn
+  // out the hardware
+  if(segment == PIN_DP)
+  {
+    int colon  = (data[DRAW_DIG2] & DRAW_TIME)    ? HIGH : LOW;
+    int degree = (data[DRAW_DIG3] & DRAW_DEGREES) ? HIGH : LOW;
+
+    digitalWrite(PIN_DIGCOL, colon);
+    digitalWrite(PIN_COL,    LOW);
+    digitalWrite(PIN_DIGL3,  degree);
+    digitalWrite(PIN_L3,     LOW);
+  }
+
   delayMicroseconds(DRAW_DELAY);
-  digitalWrite(segment, HIGH);
+
+  // reset the state
   digitalWrite(PIN_DIG1, LOW);
   digitalWrite(PIN_DIG2, LOW);
   digitalWrite(PIN_DIG3, LOW);
   digitalWrite(PIN_DIG4, LOW);
+  digitalWrite(segment,  HIGH);
+  if(segment == PIN_DP)
+  {
+    digitalWrite(PIN_DIGCOL, LOW);
+    digitalWrite(PIN_COL,    HIGH);
+    digitalWrite(PIN_DIGL3,  LOW);
+    digitalWrite(PIN_L3,     HIGH);
+  }
 }
 
 void draw(int* data)
 {
-  draw_segment(PIN_A, data);
-  draw_segment(PIN_B, data);
-  draw_segment(PIN_C, data);
-  draw_segment(PIN_D, data);
-  draw_segment(PIN_E, data);
-  draw_segment(PIN_F, data);
-  draw_segment(PIN_G, data);
+  draw_segment(PIN_A,  data);
+  draw_segment(PIN_B,  data);
+  draw_segment(PIN_C,  data);
+  draw_segment(PIN_D,  data);
+  draw_segment(PIN_E,  data);
+  draw_segment(PIN_F,  data);
+  draw_segment(PIN_G,  data);
+  draw_segment(PIN_DP, data);
 }
 
 void setup()
