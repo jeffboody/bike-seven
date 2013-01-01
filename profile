@@ -2,7 +2,7 @@
 export APP=BikeSeven
 
 # Update SDK to point to the Android SDK
-SDK=/home/jeffboody/android/android-sdk-linux_86
+SDK=/home/jeffboody/android/android-sdk
 
 #-- DON'T CHANGE BELOW LINE --
 
